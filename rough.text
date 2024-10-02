@@ -1,0 +1,349 @@
+import { supabase } from "../supabaseClient";
+import { useEffect, useState } from "react";
+
+function Dashboard() {
+  const [dashboardData, setDashboardData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser(); // Awaiting the user fetch
+
+      if (user) {
+        console.log("Authenticated User:", user.id); // Debug log for the authenticated user
+
+        const { data, error } = await supabase
+          .from("table1") // Replace with your actual table name
+          .select("*")
+          .eq("user_id", user?.id); // Assuming you have a user_id column in your table
+
+        if (error) {
+          console.error("Error fetching dashboard data:", error); // Log error details
+          setError("Error fetching dashboard data: " + error.message);
+        } else {
+          console.log("Fetched Data:", data); // Log the fetched data
+          setDashboardData(data); // Set the fetched data into state
+        }
+      }
+
+      setLoading(false); // Update loading state regardless of user presence
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  if (loading) return <div>Loading...</div>; // Show loading indicator
+
+  if (error) return <div>{error}</div>; // Show error message if fetching fails
+
+  return (
+    <div>
+      <h2>Your Dashboard Data</h2>
+      {dashboardData.length > 0 ? (
+        <ul>
+          {dashboardData.map((item) => (
+            <li key={item.id}>
+              {/* Assuming your table has a title and content column */}
+
+              <p>{item.content}</p>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>No data found.</p> // Show message if no data exists
+      )}
+    </div>
+  );
+}
+
+export default Dashboard;
+
+
+
+
+
+
+
+import { supabase } from "./supabaseClient";
+import { useEffect, useState } from "react";
+import Login from "./component/Login";
+import Signup from "./component/Signup";
+import Dashboard from "./component/Dashboard";
+
+function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true); // Added loading state
+
+  useEffect(() => {
+    const fetchSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      setLoading(false); // Set loading to false once fetched
+    };
+
+    fetchSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setLoading(false); // Update loading state on auth change
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Error signing out:", error.message);
+    } else {
+      setUser(null);
+      console.log("Signed out successfully!");
+    }
+  };
+
+  if (loading) return <div>Loading...</div>; // Show loading while fetching session
+
+  return (
+    <div>
+      {!user ? (
+        <div>
+          <h1>Login</h1>
+          <Login />
+          <h1>Sign Up</h1>
+          <Signup />
+        </div>
+      ) : (
+        <div>
+          <h1>Welcome, {user.email}</h1>
+          <button onClick={handleSignOut}>Sign Out</button>
+          <Dashboard />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default App;
+
+
+
+
+
+
+
+
+// Signup.jsx
+import { supabase } from "../supabaseClient";
+import { useState } from "react";
+
+function Signup() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleSignup = async () => {
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) {
+      alert("Error signing up: " + error.message);
+    } else {
+      alert("Check your email to confirm your signup!");
+    }
+  };
+
+  return (
+    <div>
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <button onClick={handleSignup}>Sign Up</button>
+    </div>
+  );
+}
+
+export default Signup;
+
+
+
+
+
+
+
+
+
+// Login.jsx
+import { supabase } from "../supabaseClient";
+import { useState } from "react";
+
+function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleLogin = async () => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) {
+      alert("Error logging in: " + error.message);
+    } else {
+      alert("Logged in successfully!");
+    }
+  };
+
+  return (
+    <div>
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <button onClick={handleLogin}>Login</button>
+    </div>
+  );
+}
+
+export default Login;
+
+
+
+
+
+
+
+
+
+
+
+todolist with supabase
+
+dashboard component
+
+import React, { useEffect, useState } from "react";
+import { supabase } from "../supabaseClient";
+
+const Dashboard = () => {
+  const [todos, setTodos] = useState([]);
+  const [newTodo, setNewTodo] = useState("");
+  const [loading, setLoading] = useState(true); // loading state to keep track
+  const [user, setUser] = useState(null); // storing the current loggedin user
+
+  const getTodoList = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser(); // getting the currently authenticated user
+
+    if (user) {
+      setUser(user); // Set user state
+      const { data, error } = await supabase.from("todos").select("*");
+      // .eq("user_id", user.id); // Fetch todos for the logged-in user
+
+      if (error) {
+        console.error("Error fetching todos:", error.message);
+      } else {
+        setTodos(data || []); // Set todos or an empty array
+      }
+    } else {
+      setTodos([]); // Clear todos if no user
+    }
+    setLoading(false); // Stop loading
+  };
+
+  useEffect(() => {
+    getTodoList();
+  }, []); //emptying dependency array to prevent infinite loop
+
+  const addTodo = async () => {
+    if (!newTodo) {
+      alert("Please add a todo");
+      return;
+    } // Prevent adding empty todos
+
+    // Insert todo with user_id
+    const { error } = await supabase
+      .from("todos")
+      .insert([{ task: newTodo, user_id: user.id }]); // means the user_id in todo row will be current loggedin user's id and task in db will be newTodo
+
+    if (error) {
+      console.error("Error adding todo:", error.message);
+    } else {
+      getTodoList();
+      // setTodos((prev) => [...prev, { task: newTodo, user_id: user.id }]); // todo keep the prev todos on display
+      setNewTodo("");
+    }
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  if (loading) return <p>Loading...</p>; // Show loading state
+
+  return (
+    <div className="flex flex-col justify-center items-center gap-[40px]">
+      <h1 className="text-center text-[30px] font-bold">hello {user.email}</h1>
+      <div className="flex gap-[100px] p-[20px]">
+        <div className="flex flex-col gap-[20px] flex-[25%_0_0]">
+          <h2>Add your todo here:</h2>
+          <input
+            type="text"
+            value={newTodo}
+            onChange={(e) => setNewTodo(e.target.value)}
+            placeholder="Add a new todo..."
+            className="h-[50px] p-2 rounded-md"
+          />
+          <button
+            onClick={addTodo}
+            className="bg-blue-500 hover:bg-green-600 rounded-xl"
+          >
+            Add Todo
+          </button>
+          <button onClick={signOut} className="bg-red-700 rounded-xl ">
+            Sign Out
+          </button>
+        </div>
+        <div className="">
+          <ol className="list-decimal">
+            {todos.length === 0 ? (
+              <p>No todos available</p> // showing message if no todos
+            ) : (
+              <div>
+                <h2 className="text-gray-400">Your Todo List</h2>
+
+                {todos.map((todo, index) => (
+                  <li key={index}>{todo.task}</li>
+                ))}
+              </div>
+            )}
+          </ol>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
