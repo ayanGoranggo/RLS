@@ -8,64 +8,39 @@ const Dashboard = () => {
   const [user, setUser] = useState(null);
 
   const getTodoList = async () => {
-    // Fetch the currently authenticated user
-    const { data: userData, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (authError) {
-      console.error("Error fetching user:", authError.message);
-      setLoading(false);
-      return;
+    if (user) {
+      setUser(user); // Set the user in state
+
+      // Get user role from user_roles table
+      const { data: userRoleData, error: roleError } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single(); // Ensure it returns only one row
+
+      if (roleError) {
+        console.error("Error fetching user role:", roleError.message);
+        return;
+      }
+
+      const role = userRoleData.role;
+
+      // Fetch todos based on role
+      const { data: todos, error } =
+        role === "admin"
+          ? await supabase.from("todos").select("*") // Admin can see all todos
+          : await supabase.from("todos").select("*").eq("user_id", user.id); // Normal user can only see their todos
+
+      if (error) {
+        console.error("Error fetching todos:", error.message);
+      } else {
+        setTodos(todos || []);
+      }
     }
-
-    if (!userData || !userData.user) {
-      console.error("No user is currently logged in.");
-      setLoading(false);
-      return;
-    }
-
-    const loggedInUser = userData.user;
-    setUser(loggedInUser);
-
-    // Fetch user role
-    const { data: userRoleData, error: roleError } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", loggedInUser.id)
-      .single();
-
-    if (roleError) {
-      console.error("Error fetching user role:", roleError.message);
-      setTodos([]);
-      setLoading(false);
-      return;
-    }
-
-    const userRole = userRoleData?.role;
-
-    let todosData = null;
-    let todosError = null;
-
-    // Fetch todos based on user role
-    if (userRole === "admin") {
-      // Admin can see all todos
-      ({ data: todosData, error: todosError } = await supabase
-        .from("todos")
-        .select("*"));
-    } else {
-      // Normal users can see only their own todos
-      ({ data: todosData, error: todosError } = await supabase
-        .from("todos")
-        .select("*")
-        .eq("user_id", loggedInUser.id));
-    }
-
-    if (todosError) {
-      console.error("Error fetching todos:", todosError.message);
-      setTodos([]);
-    } else {
-      setTodos(todosData || []);
-    }
-
     setLoading(false);
   };
 
@@ -99,7 +74,11 @@ const Dashboard = () => {
 
   return (
     <div className="flex flex-col justify-center items-center gap-[40px]">
-      <h1 className="text-center text-[30px] font-bold">Hello {user?.email}</h1>
+      {user && (
+        <h1 className="text-center text-[30px] font-bold">
+          Hello {user.email}
+        </h1>
+      )}
       <div className="flex gap-[100px] p-[20px]">
         <div className="flex flex-col gap-[20px] flex-[25%_0_0]">
           <h2>Add your todo here:</h2>
